@@ -52,5 +52,5 @@ jobs:
 
       - name: Run Linter
         run: |
-          find ./server/database -name "*.js" -exec jshint {} +
+          find ./server/database -name "*.js" -exec jshint --config <(echo '{"esversion": 11}') {} +
           echo "Linted all the js files successfully"
