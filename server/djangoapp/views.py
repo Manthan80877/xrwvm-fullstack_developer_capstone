@@ -7,6 +7,10 @@ from django.contrib import messages
 from datetime import datetime
 from .models import CarMake, CarModel
 from .populate import initiate
+import requests
+from .restapis import backend_url
+import requests
+from .restapis import get_request, analyze_review_sentiments, post_review
 from django.http import JsonResponse
 from django.contrib.auth import login, authenticate
 import logging
@@ -64,24 +68,53 @@ def registration(request):
 
     return JsonResponse({"error": "POST request required"}, status=405)
 
-# # Update the `get_dealerships` view to render the index page with
-# a list of dealerships
-# def get_dealerships(request):
-# ...
+def get_dealerships(request, state="All"):
+    if state == "All":
+        endpoint = "/fetchDealers"
+    else:
+        endpoint = "/fetchDealers/" + state
 
-# Create a `get_dealer_reviews` view to render the reviews of a dealer
-# def get_dealer_reviews(request,dealer_id):
-# ...
+    dealerships = get_request(endpoint)
+    return JsonResponse({"status": 200, "dealers": dealerships})
 
-# Create a `get_dealer_details` view to render the dealer details
-# def get_dealer_details(request, dealer_id):
-# ...
+def get_dealer_reviews(request, dealer_id):
+    reviews = get_request(f"/fetchReviews/dealer/{dealer_id}")
 
-# Create a `add_review` view to submit a review
-# def add_review(request):
-# ...
+    if reviews:
+        for review in reviews:
+            review["sentiment"] = analyze_review_sentiments(
+                review.get("review", "")
+            )
 
+    return JsonResponse({"status": 200, "reviews": reviews})
 
+def get_dealer_details(request, dealer_id):
+    dealer = get_request(f"/fetchDealer/{dealer_id}")
+    return JsonResponse({"status": 200, "dealer": dealer})
+
+@csrf_exempt
+def add_review(request):
+    if request.user.is_anonymous:
+        return JsonResponse(
+            {"status": 403, "message": "Unauthorized"},
+            status=403
+        )
+
+    if request.method != "POST":
+        return JsonResponse(
+            {"status": 405, "message": "POST required"},
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+        post_review(data)
+        return JsonResponse({"status": 200})
+    except Exception:
+        return JsonResponse(
+            {"status": 401, "message": "Error in posting review"},
+            status=401
+        )
 def get_cars(request):
     count = CarMake.objects.count()
     print(count)
